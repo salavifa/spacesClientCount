@@ -8,6 +8,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import logging
 from datetime import datetime
 import time
+import certifi
 
 def get_API_Key_and_auth():
     # Gets public key from spaces and places in correct format
@@ -92,14 +93,15 @@ if __name__ == "__main__":
 
 
     frameResults= []
-    token = os.environ['influxAPIKey']
-    org = os.environ['influxOrg']
-    bucket = os.environ['influxClient']
-    url= os.environ['influxURL']
+    token = "TOKE"
+    org = "ORG"
+    bucket = "BUCKET"
+    url= "URL"
     client = influxdb_client.InfluxDBClient(
         url=url,
         org=org,
-        token=token
+        token=token,
+        ssl_ca_cert=certifi.where()
     )
 
     influxdbWrite_api = client.write_api(write_options=SYNCHRONOUS)
@@ -113,18 +115,6 @@ if __name__ == "__main__":
         r = s.get('https://partners.dnaspaces.eu/api/partners/v1/firehose/events', stream=True)  # Change this to .io if needed
         try:
             for line in r.iter_lines():
-                # logger.info('Data arrived from FH API!')
-                if time.time() > timeout:
-                    timeout = time.time() + 5
-                    if intervalResults:
-                        p = intervalResults[-1]
-                        try:
-                            influxdbWrite_api.write(bucket=bucket, org=org, record=p)
-                            intervalResults = [p]
-                            logger.info('client count write to influx success!')
-                        except Exception as e:
-                            logger.info(f'client count write to influx failed! {e}')
-                            pass
 
                 if line:
                     try:
@@ -136,13 +126,20 @@ if __name__ == "__main__":
                         eventType = event['eventType']
 
                         # logger.info(f'Event type: {eventType}')
-                        # logger.info(f"{event}")event
+                        # logger.info(f"{event}")
 
 
                         if eventType == "DEVICE_COUNT":
                             cleanedData = {"measurement":"stadium","time":event["recordTimestamp"], "location":event['deviceCounts']['location']['name'], "wirelessuserCount":event['deviceCounts']['wirelessUserCount']}
                             p = influxdb_client.Point("userCount").tag("location", cleanedData["location"]).tag("timestamp",time.time()).field("clientCount",cleanedData["wirelessuserCount"])
-                            intervalResults.append(p)
+                            try:
+                                influxdbWrite_api.write(bucket=bucket, org=org, record=p)
+                                intervalResults = [p]
+                                logger.info('client count write to influx success!')
+                            except Exception as e:
+                                logger.info(f'client count write to influx failed! {e}')
+                                pass
+
 
 
                     except Exception as e:
